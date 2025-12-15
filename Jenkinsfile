@@ -1,17 +1,16 @@
 pipeline {
     agent any
 
-    tools {
-        jdk 'Java17'
-        maven 'Maven3'
-    }
-
     stages {
+        stage('Hello') {
+            steps {
+                echo 'Jenkins pipeline is running'
+            }
+        }
 
-        stage('Verify Tools') {
+        stage('Java Version') {
             steps {
                 bat 'java -version'
-                bat 'mvn -version'
             }
         }
 
@@ -21,9 +20,9 @@ pipeline {
             }
         }
 
-        stage('Run JAR') {
+        stage('List Target') {
             steps {
-                bat 'java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar'
+                bat 'dir target'
             }
         }
     }
