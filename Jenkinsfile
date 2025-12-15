@@ -1,45 +1,51 @@
-stage('Run App & Keep Alive') {
-    bat '''
-    echo ======================================
-    echo Starting Spring Boot on port 9000
-    echo ======================================
+node {
 
-    rem Start app in background and capture PID
-    start /b java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar --server.port=9000 > app.log 2>&1
-    for /f "tokens=2 delims=," %%a in ('tasklist /fi "imagename eq java.exe" /fo csv /nh') do echo %%~a > app.pid
+    checkout scm
 
-    echo Waiting for application to start...
-    ping 127.0.0.1 -n 10 > nul
+    def mvnHome = tool name: 'Maven3', type: 'maven'
+    def javaHome = tool name: 'Java17', type: 'jdk'
+    env.PATH = "${javaHome}\\bin;${mvnHome}\\bin;${env.PATH}"
 
-    echo ======================================
-    echo Checking /print endpoint (retry loop)
-    echo ======================================
+    stage('Verify Tools') {
+        bat 'java -version'
+        bat 'mvn -version'
+    }
 
-    set TRY=0
-    :RETRY
-    curl http://localhost:9000/print && goto SUCCESS
-    set /a TRY+=1
-    if %%TRY%% GEQ 5 goto FAILED
-    echo App not ready yet, retrying...
-    ping 127.0.0.1 -n 5 > nul
-    goto RETRY
+    stage('Build') {
+        bat 'mvn clean package'
+    }
 
-    :FAILED
-    echo WARNING: /print endpoint not reachable, continuing build
+    stage('Run App & Keep Alive') {
+        bat '''
+        echo ===============================
+        echo Starting Spring Boot on port 9000
+        echo ===============================
 
-    :SUCCESS
-    echo Endpoint check completed
+        rem Kill any old Spring Boot process on port 9000
+        for /f "tokens=5" %%a in ('netstat -ano ^| findstr :9000') do taskkill /PID %%a /F >nul 2>&1
 
-    echo ======================================
-    echo Keeping Tomcat alive for 120 seconds
-    echo ======================================
-    ping 127.0.0.1 -n 120 > nul
+        rem Start Spring Boot in background
+        start /b java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar --server.port=9000 > app.log 2>&1
 
-    echo ======================================
-    echo Stopping Spring Boot safely
-    echo ======================================
-    for /f %%p in (app.pid) do taskkill /PID %%p /F
+        echo Waiting for app to start...
+        ping 127.0.0.1 -n 20 > nul
 
-    echo Application stopped
-    '''
+        echo ===============================
+        echo Calling /print endpoint
+        echo ===============================
+        curl http://localhost:9000/print || echo WARNING: endpoint not reachable
+
+        echo ===============================
+        echo Keeping app alive for 120 seconds
+        echo ===============================
+        ping 127.0.0.1 -n 120 > nul
+
+        echo ===============================
+        echo Stopping Spring Boot
+        echo ===============================
+        for /f "tokens=5" %%a in ('netstat -ano ^| findstr :9000') do taskkill /PID %%a /F >nul 2>&1
+
+        echo Application stopped
+        '''
+    }
 }
