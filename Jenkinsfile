@@ -1,55 +1,45 @@
-node {
+stage('Run App & Keep Alive') {
+    bat '''
+    echo ======================================
+    echo Starting Spring Boot on port 9000
+    echo ======================================
 
-    checkout scm
+    rem Start app in background and capture PID
+    start /b java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar --server.port=9000 > app.log 2>&1
+    for /f "tokens=2 delims=," %%a in ('tasklist /fi "imagename eq java.exe" /fo csv /nh') do echo %%~a > app.pid
 
-    def mvnHome = tool name: 'Maven3', type: 'maven'
-    def javaHome = tool name: 'Java17', type: 'jdk'
-    env.PATH = "${javaHome}\\bin;${mvnHome}\\bin;${env.PATH}"
+    echo Waiting for application to start...
+    ping 127.0.0.1 -n 10 > nul
 
-    stage('Verify Tools') {
-        bat 'java -version'
-        bat 'mvn -version'
-    }
+    echo ======================================
+    echo Checking /print endpoint (retry loop)
+    echo ======================================
 
-    stage('Build') {
-        bat 'mvn clean package'
-    }
+    set TRY=0
+    :RETRY
+    curl http://localhost:9000/print && goto SUCCESS
+    set /a TRY+=1
+    if %%TRY%% GEQ 5 goto FAILED
+    echo App not ready yet, retrying...
+    ping 127.0.0.1 -n 5 > nul
+    goto RETRY
 
-    stage('Run App & Keep Alive') {
-        bat '''
-        echo ===============================
-        echo Starting Spring Boot on port 9000
-        echo ===============================
+    :FAILED
+    echo WARNING: /print endpoint not reachable, continuing build
 
-        rem Start app in background and capture PID
-        start "" cmd /c ^
-        "java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar --server.port=9000 > app.log 2>&1 & echo %%! > app.pid"
+    :SUCCESS
+    echo Endpoint check completed
 
-        echo Waiting 30 seconds for app startup...
-        timeout /t 30
+    echo ======================================
+    echo Keeping Tomcat alive for 120 seconds
+    echo ======================================
+    ping 127.0.0.1 -n 120 > nul
 
-        echo ===============================
-        echo Calling /print endpoint (NON-BLOCKING)
-        echo ===============================
+    echo ======================================
+    echo Stopping Spring Boot safely
+    echo ======================================
+    for /f %%p in (app.pid) do taskkill /PID %%p /F
 
-        curl http://localhost:9000/print
-        if errorlevel 1 (
-            echo WARNING: /print endpoint not reachable, continuing build...
-        ) else (
-            echo /print endpoint responded successfully
-        )
-
-        echo ===============================
-        echo Keeping Tomcat alive for 120 seconds
-        echo ===============================
-        timeout /t 120
-
-        echo ===============================
-        echo Stopping Spring Boot safely
-        echo ===============================
-        for /f %%p in (app.pid) do taskkill /PID %%p /F
-
-        echo Application stopped
-        '''
-    }
+    echo Application stopped
+    '''
 }
