@@ -38,7 +38,7 @@ node {
         echo ===============================
         echo Keeping app alive for 120 seconds
         echo ===============================
-        ping 127.0.0.1 -n 120 > nul
+        ping 127.0.0.1 -n 60 > nul
 
         echo ===============================
         echo Stopping Spring Boot
