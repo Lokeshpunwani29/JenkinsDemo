@@ -1,38 +1,21 @@
-node {
+stage('Run App & Test Endpoint') {
+    bat '''
+    echo Starting Spring Boot app on port 9000...
 
-    // 1️⃣ Checkout source code
-    checkout scm
+    rem Start app and capture PID
+    start "" cmd /c ^
+    "java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar --server.port=9000 > app.log 2>&1 & echo %%! > app.pid"
 
-    // 2️⃣ Load Jenkins tools
-    def mvnHome = tool name: 'Maven3', type: 'maven'
-    def javaHome = tool name: 'Java17', type: 'jdk'
-    env.PATH = "${javaHome}\\bin;${mvnHome}\\bin;${env.PATH}"
+    echo Waiting for application to start...
+    timeout /t 25
 
-    stage('Verify Tools') {
-        bat 'java -version'
-        bat 'mvn -version'
-    }
+    echo Calling API endpoint...
+    curl -f http://localhost:9000/print || exit /b 1
 
-    stage('Build') {
-        bat 'mvn clean package'
-    }
+    echo Keeping app alive for 20 seconds...
+    timeout /t 20
 
-    stage('Run App & Call API') {
-        bat '''
-        echo Starting Spring Boot application on port 9000...
-        start "" java -jar target\\JenkinsDemo-0.0.1-SNAPSHOT.jar --server.port=9000
-
-        echo Waiting for app to start...
-        timeout /t 20
-
-        echo Calling API endpoint...
-        curl http://localhost:9000/print
-
-        echo Keeping app running for some time...
-        timeout /t 30
-
-        echo Stopping application...
-        taskkill /IM java.exe /F
-        '''
-    }
+    echo Stopping Spring Boot app safely...
+    for /f %%p in (app.pid) do taskkill /PID %%p /F
+    '''
 }
