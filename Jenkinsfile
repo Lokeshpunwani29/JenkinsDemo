@@ -1,29 +1,17 @@
-pipeline {
-    agent any
+node {
+    stage('Hello') {
+        echo 'Pipeline is executing'
+    }
 
-    stages {
-        stage('Hello') {
-            steps {
-                echo 'Jenkins pipeline is running'
-            }
-        }
+    stage('Java Version') {
+        bat 'java -version'
+    }
 
-        stage('Java Version') {
-            steps {
-                bat 'java -version'
-            }
-        }
+    stage('Build') {
+        bat 'mvn clean package'
+    }
 
-        stage('Build') {
-            steps {
-                bat 'mvn clean package'
-            }
-        }
-
-        stage('List Target') {
-            steps {
-                bat 'dir target'
-            }
-        }
+    stage('List Target') {
+        bat 'dir target'
     }
 }
