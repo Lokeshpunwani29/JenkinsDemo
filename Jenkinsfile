@@ -34,7 +34,7 @@ node {
         echo App response received successfully
 
         echo Keeping app alive for 20 seconds...
-        timeout /t 120
+        timeout /t 20
 
         echo Stopping Spring Boot app safely...
         for /f %%p in (app.pid) do taskkill /PID %%p /F
